@@ -37,19 +37,24 @@ A sophisticated Python application that automates intern onboarding using a spec
    
    **⚙️ Individual Components:**
    ```bash
-   # Backend only
+   # Backend only (API server)
    python mail.py --backend-only
    
-   # Frontend only  
+   # Frontend only (Web interface)
    python mail.py --frontend-only
+   
+   # Using uvicorn directly (as requested)
+   uvicorn backend.app:app --reload
    ```
    
    **📦 Install Dependencies:**
    ```bash
    python mail.py --install
+   # OR
+   pip install -r requirements.txt
    ```
    
-   - Backend API: http://localhost:8000
+   - Backend API: http://localhost:8000 (Auto-generated docs at /docs)
    - Frontend UI: http://localhost:8501
 
 ## Project Structure
