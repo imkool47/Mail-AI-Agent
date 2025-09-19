@@ -1,591 +1,573 @@
 """
-Streamlit Frontend
-Admin interface for the Mail Agent system.
+Streamlit Frontend - 4-Agent Mail System
+Clean interface for AI Agent, Mail Agent, Database Agent, and Outlook Agent
 """
 
 import streamlit as st
 import requests
-import pandas as pd
 import json
 from datetime import datetime
-import time
-import os
-from typing import Dict, List
-from urllib.parse import parse_qs, urlparse
-
-# Configuration
-API_BASE_URL = "http://localhost:8000"
+import pandas as pd
 
 # Page configuration
 st.set_page_config(
-    page_title="Mail Agent - Intern Management",
+    page_title="Mail Agent System 2.0",
     page_icon="📧",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        color: #2E86AB;
-        text-align: center;
-        padding: 20px 0;
-    }
-    .status-success {
-        background-color: #d4edda;
-        color: #155724;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .status-error {
-        background-color: #f8d7da;
-        color: #721c24;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .status-warning {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #2E86AB;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Backend URL
+BACKEND_URL = "http://localhost:8000"
 
+# Initialize session state
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-def init_session_state():
-    """Initialize session state variables"""
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'user_info' not in st.session_state:
-        st.session_state.user_info = {}
-    if 'auth_url' not in st.session_state:
-        st.session_state.auth_url = None
-
-
-def check_api_health():
-    """Check if API is running"""
+def check_backend_connection():
+    """Check if backend is running"""
     try:
-        response = requests.get(f"{API_BASE_URL}/health", timeout=5)
+        response = requests.get(f"{BACKEND_URL}/status", timeout=5)
         return response.status_code == 200
     except:
         return False
 
-
-def get_auth_status():
-    """Check authentication status with API"""
+def call_api(endpoint, method="GET", data=None):
+    """Make API call to backend"""
     try:
-        response = requests.get(f"{API_BASE_URL}/auth/status")
-        if response.status_code == 200:
-            data = response.json()
-            st.session_state.authenticated = data.get("authenticated", False)
-            st.session_state.user_info = data.get("user_info", {})
-            return data
-        return {"authenticated": False}
-    except:
-        return {"authenticated": False}
-
-
-def get_microsoft_auth_url():
-    """Get Microsoft authentication URL"""
-    try:
-        response = requests.get(f"{API_BASE_URL}/auth/url")
-        if response.status_code == 200:
-            return response.json()["auth_url"]
+        url = f"{BACKEND_URL}{endpoint}"
+        
+        if method == "GET":
+            response = requests.get(url, timeout=30)
+        elif method == "POST":
+            response = requests.post(url, json=data, timeout=30)
+        
+        if response.status_code == 401:
+            st.error("🔒 Authentication required. Please login first.")
+            st.session_state.authenticated = False
+            return None
+        
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ API Error: {str(e)}")
         return None
-    except:
-        return None
-
-
-def handle_auth_callback(auth_code: str):
-    """Handle authentication callback"""
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/auth/callback",
-            json={"auth_code": auth_code}
-        )
-        if response.status_code == 200:
-            result = response.json()
-            if result["success"]:
-                st.session_state.authenticated = True
-                st.session_state.user_info = result["user_info"]
-                return True, "Authentication successful!"
-            else:
-                return False, result["error"]
-        return False, "Authentication failed"
-    except Exception as e:
-        return False, str(e)
-
-
-def logout():
-    """Logout user"""
-    try:
-        requests.post(f"{API_BASE_URL}/auth/logout")
-        st.session_state.authenticated = False
-        st.session_state.user_info = {}
-        st.rerun()
-    except:
-        pass
-
 
 def main():
     """Main application"""
-    init_session_state()
     
-    # Check API health
-    if not check_api_health():
-        st.error("🚨 Backend API is not running. Please start the FastAPI server.")
-        st.info("Run: `uvicorn backend.main:app --reload` from the project root directory")
+    # Title and header
+    st.title("📧 Mail Agent System 2.0")
+    st.markdown("### 4-Agent Architecture: AI • Mail • Database • Outlook")
+    
+    # Check backend connection
+    if not check_backend_connection():
+        st.error("❌ Backend server is not running!")
+        st.info("💡 Please start the system: `python mail.py` or backend only: `python mail.py --backend-only`")
         return
     
-    # Check for auth code in URL
-    query_params = st.query_params
-    if "code" in query_params and not st.session_state.authenticated:
-        auth_code = query_params["code"]
-        success, message = handle_auth_callback(auth_code)
-        if success:
-            st.success(message)
-            # Clear the URL parameters
-            st.query_params.clear()
-            st.rerun()
-        else:
-            st.error(f"Authentication failed: {message}")
-    
-    # Check authentication status
-    auth_status = get_auth_status()
-    
-    # Header
-    st.markdown('<h1 class="main-header">📧 Mail Agent - Intern Management System</h1>', 
-                unsafe_allow_html=True)
+    # Sidebar for navigation
+    st.sidebar.title("🤖 Agent Controls")
     
     # Authentication section
     if not st.session_state.authenticated:
-        show_login_page()
-    else:
-        show_main_app()
-
-
-def show_login_page():
-    """Show login page"""
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown("### 🔐 Admin Authentication Required")
-        st.info("Please connect your Microsoft admin account to manage intern accounts.")
-        
-        if st.button("🔗 Connect Microsoft Account", type="primary", use_container_width=True):
-            auth_url = get_microsoft_auth_url()
-            if auth_url:
-                st.markdown(f'<a href="{auth_url}" target="_self">Click here to authenticate with Microsoft</a>', 
-                           unsafe_allow_html=True)
-                st.balloons()
+        st.sidebar.markdown("### 🔐 Authentication")
+        if st.sidebar.button("🔗 Login with Microsoft"):
+            auth_result = call_api("/auth/login")
+            if auth_result and auth_result.get("success"):
+                st.sidebar.success("✅ Opening authentication...")
+                st.sidebar.markdown(f"[Click here to authenticate]({auth_result['auth_url']})")
             else:
-                st.error("Failed to get authentication URL. Please check your configuration.")
+                st.sidebar.error("❌ Failed to get auth URL")
         
-        st.markdown("---")
-        st.markdown("#### 📋 Setup Requirements:")
-        st.markdown("""
-        1. **Microsoft 365 Admin Account** - Required for creating intern accounts
-        2. **Azure App Registration** - With appropriate permissions
-        3. **Firebase Database** - For storing intern data
-        4. **OpenAI/Gemini API** - For AI-powered content generation
-        """)
-
-
-def show_main_app():
-    """Show main application interface"""
-    # Sidebar with user info and navigation
-    with st.sidebar:
-        st.markdown("### 👤 Admin Profile")
-        user_name = st.session_state.user_info.get("displayName", "Admin User")
-        user_email = st.session_state.user_info.get("mail", "admin@company.com")
+        st.sidebar.info("🔒 Please authenticate to access the system")
         
-        st.write(f"**Name:** {user_name}")
-        st.write(f"**Email:** {user_email}")
-        
-        if st.button("🚪 Logout", type="secondary"):
-            logout()
-        
-        st.markdown("---")
-        
-        # Navigation
-        st.markdown("### 📊 Navigation")
-        page = st.selectbox(
-            "Select Page",
-            ["Dashboard", "Process Interns", "Manage Interns", "Analytics", "Settings"],
-            index=0
-        )
+        # Show system status even without auth
+        show_system_status()
+        return
     
-    # Main content based on selected page
-    if page == "Dashboard":
-        show_dashboard()
-    elif page == "Process Interns":
-        show_process_interns()
-    elif page == "Manage Interns":
-        show_manage_interns()
-    elif page == "Analytics":
-        show_analytics()
-    elif page == "Settings":
-        show_settings()
-
-
-def show_dashboard():
-    """Show dashboard with statistics"""
-    st.markdown("## 📊 Dashboard")
+    # Main navigation for authenticated users
+    agent_choice = st.sidebar.selectbox(
+        "🤖 Select Agent",
+        ["🤖 AI Agent", "📧 Mail Agent", "🗄️ Database Agent", "🔧 Outlook Agent", "🔄 Complete Workflow"]
+    )
     
-    try:
-        # Get statistics
-        response = requests.get(f"{API_BASE_URL}/stats")
-        if response.status_code == 200:
-            stats = response.json()["statistics"]
-            
-            # Display metrics
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("Total Interns", stats["total_interns"])
-            
-            with col2:
-                st.metric("Pending", stats["pending_interns"])
-            
-            with col3:
-                st.metric("Processed", stats["processed_interns"])
-            
-            with col4:
-                completion_rate = (stats["processed_interns"] / max(stats["total_interns"], 1)) * 100
-                st.metric("Completion Rate", f"{completion_rate:.1f}%")
-            
-            # Department distribution
-            if stats["department_distribution"]:
-                st.markdown("### 🏢 Department Distribution")
-                dept_df = pd.DataFrame(
-                    list(stats["department_distribution"].items()),
-                    columns=["Department", "Count"]
-                )
-                st.bar_chart(dept_df.set_index("Department"))
-            
-            # Recent activity placeholder
-            st.markdown("### 📈 Recent Activity")
-            st.info("Recent activity feed will be displayed here.")
-            
-        else:
-            st.error("Failed to load dashboard data")
-            
-    except Exception as e:
-        st.error(f"Error loading dashboard: {e}")
-
-
-def show_process_interns():
-    """Show intern processing interface"""
-    st.markdown("## ⚙️ Process New Interns")
+    # Logout button
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.rerun()
     
-    # Processing options
-    col1, col2 = st.columns(2)
+    # Agent interfaces
+    if agent_choice == "🤖 AI Agent":
+        ai_agent_interface()
+    elif agent_choice == "📧 Mail Agent":
+        mail_agent_interface()
+    elif agent_choice == "🗄️ Database Agent":
+        database_agent_interface()
+    elif agent_choice == "🔧 Outlook Agent":
+        outlook_agent_interface()
+    elif agent_choice == "🔄 Complete Workflow":
+        complete_workflow_interface()
+
+def ai_agent_interface():
+    """AI Agent interface"""
+    st.header("🤖 AI Agent - Intelligent Processing")
+    st.markdown("*Generates content, requests database info when needed, sends to mail agent*")
+    
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.markdown("### 👤 Single Intern Processing")
+        st.subheader("💬 Process Prompt")
         
-        with st.form("single_intern_form"):
-            first_name = st.text_input("First Name*")
-            last_name = st.text_input("Last Name*")
-            email = st.text_input("Personal Email")
-            department = st.selectbox("Department*", 
-                                    ["Engineering", "Marketing", "HR", "Finance", "Operations", "Other"])
-            start_date = st.date_input("Start Date")
-            skills = st.text_area("Skills (comma-separated)")
-            education = st.text_area("Education Background")
-            experience = st.text_area("Previous Experience")
-            notes = st.text_area("Additional Notes")
-            
-            ai_service = st.selectbox("AI Service", ["openai", "gemini"])
-            domain = st.text_input("Email Domain", value="yourdomain.com")
-            
-            submitted = st.form_submit_button("🚀 Process Intern", type="primary")
-            
-            if submitted:
-                if first_name and last_name and department:
-                    process_single_intern({
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "email": email,
-                        "department": department,
-                        "start_date": str(start_date) if start_date else None,
-                        "skills": skills,
-                        "education": education,
-                        "experience": experience,
-                        "notes": notes
-                    }, ai_service, domain)
-                else:
-                    st.error("Please fill in all required fields (marked with *)")
+        # Prompt input
+        prompt = st.text_area(
+            "Enter your request:",
+            placeholder="Examples:\n- Send intern policy to manager@company.com\n- Show me intern reports for Q3\n- Generate summary of new hires",
+            height=100
+        )
+        
+        # AI service selection
+        service = st.selectbox("🤖 AI Service", ["openai", "gemini"])
+        
+        if st.button("🚀 Process Prompt"):
+            if prompt:
+                with st.spinner("🤖 AI Agent processing..."):
+                    result = call_api("/ai/process", "POST", {
+                        "prompt": prompt,
+                        "service": service
+                    })
+                    
+                    if result:
+                        if result.get("success"):
+                            st.success("✅ AI processing completed!")
+                            
+                            # Show results
+                            st.markdown("### 📋 Generated Content")
+                            st.write(result["content"])
+                            
+                            # Show workflow details
+                            if result.get("database_used"):
+                                st.info(f"🗄️ Database accessed: {result['database_info']['data_type']}")
+                            
+                            if result.get("email_sent"):
+                                st.info("📧 Email sent via Mail Agent")
+                                
+                            # Show full result in expander
+                            with st.expander("🔍 Full Result Details"):
+                                st.json(result)
+                        else:
+                            st.error(f"❌ AI processing failed: {result.get('error', 'Unknown error')}")
+            else:
+                st.warning("⚠️ Please enter a prompt")
     
     with col2:
-        st.markdown("### 📂 Batch Processing")
+        st.subheader("📊 Quick Stats")
         
-        uploaded_file = st.file_uploader("Upload CSV file with intern data", type="csv")
-        
-        if uploaded_file:
-            try:
-                df = pd.read_csv(uploaded_file)
-                st.write("Preview of uploaded data:")
-                st.dataframe(df.head())
-                
-                if st.button("🔄 Process All Interns", type="primary"):
-                    process_batch_interns(df, ai_service, domain)
-                    
-            except Exception as e:
-                st.error(f"Error reading CSV file: {e}")
-        
-        st.markdown("#### 📋 CSV Format Requirements:")
+        # Show agent capabilities
         st.markdown("""
-        Required columns:
-        - `first_name`
-        - `last_name` 
-        - `department`
-        
-        Optional columns:
-        - `email`
-        - `start_date`
-        - `skills`
-        - `education`
-        - `experience`
-        - `notes`
+        **🤖 AI Agent Capabilities:**
+        - ✅ Process any user prompt
+        - ✅ Request database info when needed
+        - ✅ Generate intelligent content
+        - ✅ Send emails via Mail Agent
+        - ✅ Coordinate with all agents
         """)
 
-
-def process_single_intern(intern_data: Dict, ai_service: str, domain: str):
-    """Process a single intern"""
-    try:
-        with st.spinner("Processing intern... This may take a few minutes."):
-            response = requests.post(
-                f"{API_BASE_URL}/process-intern",
-                json={
-                    "intern_data": intern_data,
-                    "ai_service": ai_service,
-                    "domain": domain
-                }
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result["success"]:
-                    st.success(f"✅ Successfully processed {intern_data['first_name']} {intern_data['last_name']}")
-                    st.info(f"📧 Outlook email created: {result['outlook_email']}")
-                    
-                    with st.expander("View AI-generated summary"):
-                        st.write(result["summary"])
-                else:
-                    st.error(f"Processing failed: {result.get('error', 'Unknown error')}")
-            else:
-                st.error(f"API request failed: {response.status_code}")
-                
-    except Exception as e:
-        st.error(f"Error processing intern: {e}")
-
-
-def process_batch_interns(df: pd.DataFrame, ai_service: str, domain: str):
-    """Process multiple interns from DataFrame"""
-    try:
-        interns_data = []
-        for _, row in df.iterrows():
-            intern_data = {
-                "first_name": str(row.get("first_name", "")),
-                "last_name": str(row.get("last_name", "")),
-                "email": str(row.get("email", "")) if pd.notna(row.get("email")) else "",
-                "department": str(row.get("department", "")),
-                "start_date": str(row.get("start_date", "")) if pd.notna(row.get("start_date")) else None,
-                "skills": str(row.get("skills", "")) if pd.notna(row.get("skills")) else "",
-                "education": str(row.get("education", "")) if pd.notna(row.get("education")) else "",
-                "experience": str(row.get("experience", "")) if pd.notna(row.get("experience")) else "",
-                "notes": str(row.get("notes", "")) if pd.notna(row.get("notes")) else ""
-            }
-            
-            interns_data.append({
-                "intern_data": intern_data,
-                "ai_service": ai_service,
-                "domain": domain
-            })
-        
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        with st.spinner(f"Processing {len(interns_data)} interns..."):
-            response = requests.post(
-                f"{API_BASE_URL}/process-batch",
-                json=interns_data
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                progress_bar.progress(1.0)
-                
-                st.success(f"✅ Batch processing completed!")
-                st.info(f"Successfully processed: {result['successful']}/{result['total_processed']}")
-                
-                if result['failed'] > 0:
-                    st.warning(f"⚠️ Failed to process: {result['failed']} interns")
-                    
-                    # Show failed results
-                    with st.expander("View detailed results"):
-                        for item in result['results']:
-                            if not item['result']['success']:
-                                st.error(f"❌ {item['intern_name']}: {item['result']['error']}")
-                            else:
-                                st.success(f"✅ {item['intern_name']}: Processed successfully")
-            else:
-                st.error(f"Batch processing failed: {response.status_code}")
-                
-    except Exception as e:
-        st.error(f"Error in batch processing: {e}")
-
-
-def show_manage_interns():
-    """Show intern management interface"""
-    st.markdown("## 👥 Manage Interns")
+def mail_agent_interface():
+    """Mail Agent interface"""
+    st.header("📧 Mail Agent - Email Operations")
+    st.markdown("*Handles all email sending operations in the system*")
     
-    try:
-        # Get all interns
-        response = requests.get(f"{API_BASE_URL}/interns")
-        if response.status_code == 200:
-            interns = response.json()["interns"]
-            
-            if interns:
-                df = pd.DataFrame(interns)
-                
-                # Filters
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    status_filter = st.selectbox("Filter by Status", 
-                                               ["All", "pending", "processed", "failed"])
-                
-                with col2:
-                    dept_filter = st.selectbox("Filter by Department", 
-                                             ["All"] + list(df["department"].unique()))
-                
-                with col3:
-                    if st.button("🔄 Refresh Data"):
-                        st.rerun()
-                
-                # Apply filters
-                filtered_df = df.copy()
-                if status_filter != "All":
-                    filtered_df = filtered_df[filtered_df["status"] == status_filter]
-                if dept_filter != "All":
-                    filtered_df = filtered_df[filtered_df["department"] == dept_filter]
-                
-                st.dataframe(
-                    filtered_df,
-                    use_container_width=True,
-                    hide_index=True
-                )
-                
-                # Actions
-                st.markdown("### 🛠️ Actions")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.button("📧 Send Test Email"):
-                        st.info("Test email functionality would be implemented here")
-                
-                with col2:
-                    if st.button("📊 Generate Report"):
-                        st.info("Report generation would be implemented here")
-                        
-            else:
-                st.info("No interns found. Start by processing some interns!")
-                
-        else:
-            st.error("Failed to load intern data")
-            
-    except Exception as e:
-        st.error(f"Error loading interns: {e}")
-
-
-def show_analytics():
-    """Show analytics and insights"""
-    st.markdown("## 📈 Analytics & Insights")
+    tab1, tab2, tab3 = st.tabs(["📤 Send Email", "📋 Bulk Emails", "🔑 Credential Emails"])
     
-    try:
-        # Get AI analysis
-        col1, col2 = st.columns(2)
+    with tab1:
+        st.subheader("📤 Send Single Email")
         
-        with col1:
-            ai_service = st.selectbox("Select AI Service for Analysis", ["openai", "gemini"])
+        recipient = st.text_input("📧 Recipient Email", placeholder="user@company.com")
+        subject = st.text_input("📝 Subject", placeholder="Email Subject")
+        content = st.text_area("💬 Content", placeholder="Email body content...", height=150)
+        email_type = st.selectbox("📋 Email Type", ["general", "summary", "policy", "credentials"])
         
-        with col2:
-            if st.button("🤖 Generate AI Insights", type="primary"):
-                with st.spinner("Generating AI insights..."):
-                    response = requests.post(f"{API_BASE_URL}/ai/analyze?ai_service={ai_service}")
+        if st.button("📤 Send Email"):
+            if recipient and subject and content:
+                with st.spinner("📧 Sending email..."):
+                    result = call_api("/mail/send", "POST", {
+                        "recipient_email": recipient,
+                        "subject": subject,
+                        "content": content,
+                        "email_type": email_type
+                    })
                     
-                    if response.status_code == 200:
-                        result = response.json()
-                        if result["success"]:
-                            st.markdown("### 🎯 AI Analysis Results")
-                            st.write(result["analysis"])
-                        else:
-                            st.error(f"Analysis failed: {result['error']}")
+                    if result and result.get("success"):
+                        st.success(f"✅ Email sent to {recipient}")
+                        st.json(result)
                     else:
-                        st.error("Failed to generate analysis")
-        
-        # Placeholder for additional analytics
-        st.markdown("### 📊 Performance Metrics")
-        st.info("Additional analytics charts and metrics will be displayed here.")
-        
-    except Exception as e:
-        st.error(f"Error in analytics: {e}")
-
-
-def show_settings():
-    """Show settings page"""
-    st.markdown("## ⚙️ Settings")
+                        st.error(f"❌ Failed to send email: {result.get('error') if result else 'Unknown error'}")
+            else:
+                st.warning("⚠️ Please fill in all fields")
     
-    try:
-        # Get current settings
-        response = requests.get(f"{API_BASE_URL}/settings")
-        if response.status_code == 200:
-            settings = response.json()["settings"]
-            
-            st.markdown("### 🏢 Organization Settings")
-            
-            with st.form("settings_form"):
-                company_name = st.text_input("Company Name", value=settings.get("company_name", ""))
-                email_template = st.text_area("Email Template", value=settings.get("email_template", ""))
-                password_length = st.number_input("Default Password Length", 
-                                                value=settings.get("default_password_length", 8),
-                                                min_value=6, max_value=20)
+    with tab2:
+        st.subheader("📋 Bulk Email Sending")
+        
+        recipients_text = st.text_area(
+            "📧 Recipients (JSON format)",
+            placeholder='[{"name": "John", "email": "john@company.com"}, {"name": "Jane", "email": "jane@company.com"}]',
+            height=100
+        )
+        
+        bulk_subject = st.text_input("📝 Subject Template", placeholder="Welcome {name}!")
+        bulk_content = st.text_area("💬 Content Template", placeholder="Dear {name}, welcome to {email}...", height=100)
+        bulk_type = st.selectbox("📋 Bulk Email Type", ["general", "welcome", "policy", "notification"])
+        
+        if st.button("📋 Send Bulk Emails"):
+            if recipients_text and bulk_subject and bulk_content:
+                try:
+                    recipients = json.loads(recipients_text)
+                    with st.spinner("📧 Sending bulk emails..."):
+                        result = call_api("/mail/send-bulk", "POST", {
+                            "recipients": recipients,
+                            "subject": bulk_subject,
+                            "content_template": bulk_content,
+                            "email_type": bulk_type
+                        })
+                        
+                        if result and result.get("success"):
+                            st.success(f"✅ Sent {result['successful']}/{result['total_recipients']} emails")
+                            st.json(result)
+                        else:
+                            st.error(f"❌ Bulk email failed: {result.get('error') if result else 'Unknown error'}")
+                except json.JSONDecodeError:
+                    st.error("❌ Invalid JSON format for recipients")
+            else:
+                st.warning("⚠️ Please fill in all fields")
+    
+    with tab3:
+        st.subheader("🔑 Send Credential Email")
+        
+        cred_recipient = st.text_input("📧 Personal Email", placeholder="intern@personal.com")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            cred_email = st.text_input("📧 New Email", placeholder="intern@company.com")
+        with col2:
+            cred_password = st.text_input("🔑 Password", placeholder="changeit@123", type="password")
+        
+        welcome_msg = st.text_area("💬 Welcome Message", placeholder="Welcome to our team! We're excited to have you...", height=100)
+        
+        if st.button("🔑 Send Credentials"):
+            if cred_recipient and cred_email and cred_password:
+                with st.spinner("🔑 Sending credential email..."):
+                    result = call_api("/mail/send-credentials", "POST", {
+                        "recipient_email": cred_recipient,
+                        "credentials": {"email": cred_email, "password": cred_password},
+                        "welcome_message": welcome_msg
+                    })
+                    
+                    if result and result.get("success"):
+                        st.success(f"✅ Credential email sent to {cred_recipient}")
+                        st.json(result)
+                    else:
+                        st.error(f"❌ Failed to send credentials: {result.get('error') if result else 'Unknown error'}")
+            else:
+                st.warning("⚠️ Please fill in recipient, email and password")
+
+def database_agent_interface():
+    """Database Agent interface"""
+    st.header("🗄️ Database Agent - Data Access")
+    st.markdown("*Pure database operations - read, write, search data*")
+    
+    tab1, tab2, tab3 = st.tabs(["👥 Interns", "📄 Documents", "➕ Add Data"])
+    
+    with tab1:
+        st.subheader("👥 Intern Management")
+        
+        if st.button("🔄 Refresh Intern Data"):
+            with st.spinner("🗄️ Fetching intern data..."):
+                result = call_api("/database/interns")
                 
-                if st.form_submit_button("💾 Save Settings"):
-                    st.success("Settings saved! (Note: Backend implementation needed)")
-            
-            st.markdown("### 🔧 System Information")
+                if result and result.get("success"):
+                    st.success(f"✅ Found {result['count']} interns")
+                    
+                    if result["data"]:
+                        df = pd.DataFrame(result["data"])
+                        st.dataframe(df, use_container_width=True)
+                    else:
+                        st.info("ℹ️ No intern data found")
+                else:
+                    st.error("❌ Failed to fetch intern data")
+    
+    with tab2:
+        st.subheader("📄 Document Collections")
+        
+        collection = st.selectbox("📁 Collection", ["policies", "reports", "general", "projects"])
+        
+        if st.button(f"📄 Get {collection.title()} Documents"):
+            with st.spinner(f"🗄️ Fetching {collection} documents..."):
+                result = call_api(f"/database/documents/{collection}")
+                
+                if result and result.get("success"):
+                    st.success(f"✅ Found {result['count']} documents in {collection}")
+                    
+                    if result["data"]:
+                        st.json(result["data"])
+                    else:
+                        st.info(f"ℹ️ No documents found in {collection}")
+                else:
+                    st.error(f"❌ Failed to fetch {collection} documents")
+    
+    with tab3:
+        st.subheader("➕ Add New Intern")
+        
+        with st.form("add_intern_form"):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.write("**API Status:** ✅ Connected")
-                st.write("**Database:** ✅ Connected")
+                name = st.text_input("👤 Full Name", placeholder="John Doe")
+                personal_email = st.text_input("📧 Personal Email", placeholder="john@personal.com")
+                department = st.text_input("🏢 Department", placeholder="Engineering")
             
             with col2:
-                st.write("**Authentication:** ✅ Active")
-                st.write("**AI Services:** ✅ Available")
-                
-        else:
-            st.error("Failed to load settings")
+                start_date = st.date_input("📅 Start Date")
+                skills = st.text_input("🛠️ Skills (comma separated)", placeholder="Python, JavaScript, React")
+                education = st.text_input("🎓 Education", placeholder="Computer Science, XYZ University")
             
-    except Exception as e:
-        st.error(f"Error loading settings: {e}")
+            submitted = st.form_submit_button("➕ Add Intern to Database")
+            
+            if submitted:
+                if name and personal_email and department:
+                    intern_data = {
+                        "name": name,
+                        "personal_email": personal_email,
+                        "department": department,
+                        "start_date": start_date.isoformat(),
+                        "skills": [skill.strip() for skill in skills.split(",")] if skills else [],
+                        "education": education
+                    }
+                    
+                    with st.spinner("🗄️ Adding intern to database..."):
+                        result = call_api("/database/intern", "POST", intern_data)
+                        
+                        if result and result.get("success"):
+                            st.success(f"✅ Added {name} to database")
+                            st.json(result)
+                        else:
+                            st.error(f"❌ Failed to add intern: {result.get('error') if result else 'Unknown error'}")
+                else:
+                    st.warning("⚠️ Please fill in name, personal email, and department")
 
+def outlook_agent_interface():
+    """Outlook Agent interface"""
+    st.header("🔧 Outlook Agent - Email Account Creation")
+    st.markdown("*Creates new email accounts and sends credentials to personal emails*")
+    
+    tab1, tab2 = st.tabs(["👤 Single Account", "👥 Bulk Accounts"])
+    
+    with tab1:
+        st.subheader("👤 Create Single Email Account")
+        
+        with st.form("create_email_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                name = st.text_input("👤 Full Name", placeholder="John Doe")
+                personal_email = st.text_input("📧 Personal Email", placeholder="john@personal.com")
+                department = st.text_input("🏢 Department", placeholder="Engineering")
+            
+            with col2:
+                start_date = st.date_input("📅 Start Date")
+                skills = st.text_input("🛠️ Skills", placeholder="Python, JavaScript")
+                education = st.text_input("🎓 Education", placeholder="Computer Science")
+            
+            submitted = st.form_submit_button("🔧 Create Email Account")
+            
+            if submitted:
+                if name and personal_email and department:
+                    intern_data = {
+                        "name": name,
+                        "personal_email": personal_email,
+                        "department": department,
+                        "start_date": start_date.isoformat(),
+                        "skills": [skills] if skills else [],
+                        "education": education
+                    }
+                    
+                    with st.spinner("🔧 Creating email account..."):
+                        result = call_api("/outlook/create-email", "POST", intern_data)
+                        
+                        if result and result.get("success"):
+                            st.success(f"✅ Email account created for {name}")
+                            
+                            # Show account details
+                            st.markdown("### 📧 Account Details")
+                            st.info(f"**New Email:** {result.get('new_email', 'N/A')}")
+                            st.info(f"**Password:** {result.get('password', 'N/A')}")
+                            st.info(f"**Credentials sent to:** {result.get('personal_email', 'N/A')}")
+                            
+                            with st.expander("🔍 Full Result"):
+                                st.json(result)
+                        else:
+                            st.error(f"❌ Failed to create email: {result.get('error') if result else 'Unknown error'}")
+                else:
+                    st.warning("⚠️ Please fill in name, personal email, and department")
+    
+    with tab2:
+        st.subheader("👥 Bulk Email Account Creation")
+        
+        st.markdown("Upload intern data in JSON format:")
+        
+        bulk_interns_text = st.text_area(
+            "👥 Interns Data (JSON)",
+            placeholder='''[
+    {"name": "John Doe", "personal_email": "john@personal.com", "department": "Engineering"},
+    {"name": "Jane Smith", "personal_email": "jane@personal.com", "department": "Marketing"}
+]''',
+            height=200
+        )
+        
+        if st.button("👥 Create Bulk Email Accounts"):
+            if bulk_interns_text:
+                try:
+                    interns_data = json.loads(bulk_interns_text)
+                    
+                    with st.spinner("🔧 Creating multiple email accounts..."):
+                        result = call_api("/outlook/create-bulk-emails", "POST", interns_data)
+                        
+                        if result and result.get("success"):
+                            st.success(f"✅ Created {result['successful']}/{result['total_interns']} email accounts")
+                            
+                            # Show summary
+                            st.markdown("### 📊 Creation Summary")
+                            st.metric("Total Processed", result["total_interns"])
+                            st.metric("Successful", result["successful"])
+                            st.metric("Failed", result["failed"])
+                            
+                            with st.expander("🔍 Detailed Results"):
+                                st.json(result["results"])
+                        else:
+                            st.error(f"❌ Bulk creation failed: {result.get('error') if result else 'Unknown error'}")
+                            
+                except json.JSONDecodeError:
+                    st.error("❌ Invalid JSON format")
+            else:
+                st.warning("⚠️ Please enter intern data")
+
+def complete_workflow_interface():
+    """Complete workflow interface"""
+    st.header("🔄 Complete Workflow - All Agents Working Together")
+    st.markdown("*Database → Outlook → Mail → AI coordination*")
+    
+    st.subheader("🚀 Complete Intern Setup")
+    st.markdown("This workflow demonstrates all 4 agents working together:")
+    
+    # Workflow steps
+    st.markdown("""
+    **🔄 Workflow Steps:**
+    1. **🗄️ Database Agent** - Adds intern to database
+    2. **🔧 Outlook Agent** - Creates company email account
+    3. **📧 Mail Agent** - Sends credentials to personal email
+    4. **🤖 AI Agent** - Generates personalized welcome message
+    """)
+    
+    st.divider()
+    
+    with st.form("complete_workflow_form"):
+        st.subheader("👤 Intern Information")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input("👤 Full Name", placeholder="John Doe")
+            personal_email = st.text_input("📧 Personal Email", placeholder="john@personal.com")
+            department = st.selectbox("🏢 Department", ["Engineering", "Marketing", "HR", "Finance", "Operations"])
+        
+        with col2:
+            start_date = st.date_input("📅 Start Date")
+            skills = st.text_input("🛠️ Skills (comma separated)", placeholder="Python, JavaScript, React")
+            education = st.text_input("🎓 Education", placeholder="Computer Science, XYZ University")
+        
+        submitted = st.form_submit_button("🚀 Start Complete Setup", type="primary")
+        
+        if submitted:
+            if name and personal_email and department:
+                intern_data = {
+                    "name": name,
+                    "personal_email": personal_email,
+                    "department": department,
+                    "start_date": start_date.isoformat(),
+                    "skills": [skill.strip() for skill in skills.split(",")] if skills else [],
+                    "education": education
+                }
+                
+                # Progress tracking
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                with st.spinner("🚀 Running complete workflow..."):
+                    # Update progress
+                    progress_bar.progress(25)
+                    status_text.text("🗄️ Adding to database...")
+                    
+                    result = call_api("/workflow/complete-intern-setup", "POST", intern_data)
+                    
+                    progress_bar.progress(100)
+                    status_text.text("✅ Workflow completed!")
+                    
+                    if result and result.get("success"):
+                        st.success(f"🎉 Complete setup finished for {name}!")
+                        
+                        # Show workflow results
+                        st.markdown("### 📊 Workflow Results")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        
+                        with col1:
+                            db_status = "✅" if result["steps"]["database_added"] else "❌"
+                            st.metric("🗄️ Database", db_status)
+                        
+                        with col2:
+                            email_status = "✅" if result["steps"]["email_created"] else "❌"
+                            st.metric("🔧 Email Created", email_status)
+                        
+                        with col3:
+                            cred_status = "✅" if result["steps"]["credentials_sent"] else "❌"
+                            st.metric("📧 Credentials Sent", cred_status)
+                        
+                        with col4:
+                            ai_status = "✅" if result["steps"]["ai_welcome"] else "❌"
+                            st.metric("🤖 AI Welcome", ai_status)
+                        
+                        # Show details
+                        st.markdown("### 📋 Setup Details")
+                        st.info(f"**Company Email:** {result['details'].get('new_email', 'N/A')}")
+                        st.info(f"**Personal Email:** {result['details'].get('personal_email', 'N/A')}")
+                        
+                        with st.expander("🔍 Full Workflow Result"):
+                            st.json(result)
+                    else:
+                        st.error(f"❌ Workflow failed: {result.get('error') if result else 'Unknown error'}")
+            else:
+                st.warning("⚠️ Please fill in name, personal email, and department")
+
+def show_system_status():
+    """Show system status"""
+    st.header("📊 System Status")
+    
+    if st.button("🔄 Refresh Status"):
+        with st.spinner("Checking system status..."):
+            result = call_api("/status")
+            
+            if result:
+                st.success("✅ System is operational")
+                
+                # Agent status
+                st.markdown("### 🤖 Agent Status")
+                for agent, status in result["agents"].items():
+                    st.markdown(f"- **{agent}**: {status}")
+                
+                # System info
+                with st.expander("🔍 Detailed System Info"):
+                    st.json(result)
+            else:
+                st.error("❌ Cannot connect to system")
 
 if __name__ == "__main__":
     main()

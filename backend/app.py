@@ -14,6 +14,9 @@ from datetime import datetime
 import asyncio
 
 # Import all 4 agents
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents import ai_agent, mail_agent, database_agent, outlook_agent
 
 # Configure logging
@@ -391,7 +394,7 @@ async def system_status():
 if __name__ == "__main__":
     logger.info("🚀 Starting Mail Agent System with 4-Agent Architecture")
     uvicorn.run(
-        "main:app",
+        "app:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
