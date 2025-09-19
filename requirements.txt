@@ -1,0 +1,26 @@
+# Core FastAPI Backend
+fastapi
+uvicorn
+python-multipart
+pydantic
+
+# Frontend
+streamlit
+pandas
+
+# AI Services
+openai
+google-generativeai
+
+# Database
+firebase-admin
+
+# Microsoft Graph API
+msal
+requests
+
+# Environment & Configuration
+python-dotenv
+
+# Additional packages for new 4-agent architecture
+# email and smtplib are built-in Python modules
