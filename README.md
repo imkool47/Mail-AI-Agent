@@ -72,6 +72,36 @@ Mail Agent/
 └── README.md                # This file
 ```
 
+## Why Azure App Registration is Required
+
+**Important:** You **MUST** create an Azure App Registration to use Microsoft Graph API - there's no way around this requirement.
+
+### Why Azure App Registration is Needed:
+
+1. **Microsoft Graph API Requirement**: Microsoft Graph API (which manages Outlook/Office 365) requires authentication through Azure AD
+2. **Security & Permissions**: Azure App Registration defines what your application is allowed to do (create users, send emails, etc.)
+3. **OAuth2 Authentication**: This is Microsoft's standard security protocol - no app can access their services without it
+4. **Account Creation**: To create new Outlook email accounts, you need admin-level permissions that only Azure App Registration can provide
+
+### What Azure App Registration Gives You:
+- **Client ID & Secret**: Authentication credentials for your app
+- **Tenant ID**: Identifies your organization
+- **Permissions**: Specific rights to create users, send emails, manage accounts
+- **Secure Token Exchange**: Safe way to access Microsoft services
+
+### The Process is Simple:
+1. Go to [Azure Portal](https://portal.azure.com) (free Microsoft account needed)
+2. Create new "App Registration" (takes 2 minutes)
+3. Copy the Client ID, Secret, and Tenant ID to your `.env` file
+4. Set required permissions for user creation and email sending
+
+**Without Azure App Registration, the system cannot:**
+- Create new Outlook email accounts
+- Send emails through Microsoft Graph
+- Access any Microsoft 365 services
+
+This is a Microsoft security requirement, not a limitation of this application.
+
 ## Configuration
 
 ### Required Environment Variables
@@ -161,11 +191,28 @@ The system uses a specialized 4-agent architecture for clean separation of conce
 
 ## Security & Password Policy
 
-- **Secure Credentials**: Outlook Agent generates unique, secure passwords for each intern
-- **Credential Delivery**: Mail Agent sends credentials securely to personal email addresses
-- **First Login**: Interns must change password on first Microsoft account login
-- **No Hardcoded Passwords**: System generates unique credentials for each account
-- **Encrypted Storage**: All sensitive data stored securely in Firebase
+### Simplified Temporary Password System
+
+For simplicity and ease of management, this system uses a **fixed temporary password** approach:
+
+- **Temporary Password**: All new accounts get the password `changeit@123`
+- **Security Requirement**: Users MUST change this password on first login to Microsoft
+- **Force Password Change**: Microsoft accounts are configured with `forceChangePasswordNextSignIn: true`
+- **User Notification**: Welcome emails clearly instruct users to change their password immediately
+
+### Why This Approach:
+- **Simple Management**: No need to track complex passwords
+- **Clear User Instructions**: Easy for interns to understand
+- **Microsoft Security**: Microsoft forces password change on first login
+- **Quick Setup**: Administrators can easily help users if needed
+
+### Security Features:
+- **Temporary Only**: Password `changeit@123` only works for first login
+- **Forced Change**: Microsoft requires new password before access
+- **Email Notification**: Clear instructions sent to personal email
+- **Secure Storage**: All credentials and data stored securely in Firebase
+
+**Important**: The temporary password `changeit@123` is only valid until the user's first login when Microsoft forces them to create a secure, personal password.
 
 ## Manual Testing
 

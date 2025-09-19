@@ -29,8 +29,8 @@ class AIAgent:
         # Initialize OpenAI if key available
         openai_key = os.getenv("OPENAI_API_KEY")
         if openai_key:
-            openai.api_key = openai_key
-            self.openai_client = openai
+            from openai import OpenAI
+            self.openai_client = OpenAI(api_key=openai_key)
             logger.info("✅ OpenAI client initialized")
         
         # Initialize Gemini if key available
@@ -118,14 +118,14 @@ class AIAgent:
             """
             
             if service == "openai" and self.openai_client:
-                response = await self.openai_client.ChatCompletion.acreate(
+                response = self.openai_client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": analysis_prompt}],
                     max_tokens=200
                 )
                 content = response.choices[0].message.content
             elif service == "gemini" and self.gemini_client:
-                response = await self.gemini_client.generate_content_async(analysis_prompt)
+                response = self.gemini_client.generate_content(analysis_prompt)
                 content = response.text
             else:
                 # Fallback analysis
@@ -151,7 +151,7 @@ class AIAgent:
         """Request information from database agent"""
         try:
             # Import database agent functions
-            from .database_agent import get_documents, search_documents, fetch_data
+            from .database_agent import get_documents, fetch_data
             
             logger.info(f"🗄️ Requesting {data_type} data from database")
             
@@ -202,7 +202,7 @@ class AIAgent:
             """
             
             if service == "openai" and self.openai_client:
-                response = await self.openai_client.ChatCompletion.acreate(
+                response = self.openai_client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": full_prompt}],
                     max_tokens=1000
@@ -210,7 +210,7 @@ class AIAgent:
                 content = response.choices[0].message.content
                 
             elif service == "gemini" and self.gemini_client:
-                response = await self.gemini_client.generate_content_async(full_prompt)
+                response = self.gemini_client.generate_content(full_prompt)
                 content = response.text
                 
             else:

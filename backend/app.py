@@ -379,7 +379,7 @@ async def system_status():
         },
         "authentication": {
             "status": "✅ Authenticated" if auth_state["authenticated"] else "❌ Not authenticated",
-            "user": auth_state.get("user_info", {}).get("displayName", "None")
+            "user": (auth_state.get("user_info") or {}).get("displayName", "None")
         },
         "endpoints": {
             "ai_processing": "/ai/process",

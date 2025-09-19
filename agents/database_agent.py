@@ -264,6 +264,120 @@ class FirebaseDatabaseAgent:
             logger.error(f"Error getting pending interns: {e}")
             raise
 
+    async def add_intern(self, intern_data: Dict) -> Dict:
+        """
+        Add a new intern to the database.
+        
+        Args:
+            intern_data: Dictionary containing intern information
+            
+        Returns:
+            Result dictionary with success status and intern ID
+        """
+        try:
+            # Add timestamp
+            intern_data['created_at'] = datetime.utcnow().isoformat()
+            intern_data['updated_at'] = datetime.utcnow().isoformat()
+            
+            # Add to Firestore
+            doc_ref = self.db.collection('interns').add(intern_data)
+            intern_id = doc_ref[1].id
+            
+            logger.info(f"✅ Added intern to database: {intern_data.get('name', 'Unknown')} (ID: {intern_id})")
+            
+            return {
+                "success": True,
+                "intern_id": intern_id,
+                "message": f"Intern {intern_data.get('name', 'Unknown')} added successfully"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to add intern: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def update_intern(self, intern_identifier: str, update_data: Dict) -> Dict:
+        """
+        Update an intern's data in the database.
+        
+        Args:
+            intern_identifier: Name or ID of the intern
+            update_data: Dictionary containing fields to update
+            
+        Returns:
+            Result dictionary with success status
+        """
+        try:
+            # Add timestamp
+            update_data['updated_at'] = datetime.utcnow().isoformat()
+            
+            # Try to find by name first, then by ID
+            query = self.db.collection('interns').where(
+                filter=FieldFilter('name', '==', intern_identifier)
+            )
+            docs = list(query.stream())
+            
+            if not docs:
+                # Try to find by document ID
+                try:
+                    doc_ref = self.db.collection('interns').document(intern_identifier)
+                    if doc_ref.get().exists:
+                        docs = [doc_ref.get()]
+                except:
+                    pass
+            
+            if not docs:
+                return {
+                    "success": False,
+                    "error": f"Intern not found: {intern_identifier}"
+                }
+            
+            # Update the first match
+            doc = docs[0]
+            doc.reference.update(update_data)
+            
+            logger.info(f"✅ Updated intern: {intern_identifier}")
+            
+            return {
+                "success": True,
+                "message": f"Intern {intern_identifier} updated successfully"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update intern {intern_identifier}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def get_documents(self, collection_name: str) -> List[Dict]:
+        """
+        Get all documents from a specific collection.
+        
+        Args:
+            collection_name: Name of the Firestore collection
+            
+        Returns:
+            List of documents from the collection
+        """
+        try:
+            docs = self.db.collection(collection_name).stream()
+            result = []
+            
+            for doc in docs:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                result.append(data)
+            
+            logger.info(f"Retrieved {len(result)} documents from {collection_name}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting documents from {collection_name}: {e}")
+            return []
+
 
 # Global instance (lazy initialization)
 _database_agent = None
@@ -303,6 +417,34 @@ async def get_settings() -> Dict:
 
 async def log_email(email_log: Dict) -> str:
     """Public interface for logging email operations"""
+    agent = get_database_agent()
+    if agent.db is None:
+        raise Exception("Firebase not initialized. Please check your credentials.")
+    return await agent.save_email_log(email_log)
+
+
+async def add_intern(intern_data: Dict) -> Dict:
+    """Public interface for adding intern data"""
+    agent = get_database_agent()
+    if agent.db is None:
+        raise Exception("Firebase not initialized. Please check your credentials.")
+    return await agent.add_intern(intern_data)
+
+
+async def update_intern(intern_identifier: str, update_data: Dict) -> Dict:
+    """Public interface for updating intern data"""
+    agent = get_database_agent()
+    if agent.db is None:
+        raise Exception("Firebase not initialized. Please check your credentials.")
+    return await agent.update_intern(intern_identifier, update_data)
+
+
+async def get_documents(collection_name: str) -> List[Dict]:
+    """Public interface for getting documents from a collection"""
+    agent = get_database_agent()
+    if agent.db is None:
+        raise Exception("Firebase not initialized. Please check your credentials.")
+    return await agent.get_documents(collection_name)
     agent = get_database_agent()
     if agent.db is None:
         raise Exception("Firebase not initialized. Please check your credentials.")
