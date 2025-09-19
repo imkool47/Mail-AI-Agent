@@ -1,6 +1,25 @@
 # Mail Agent - 4-Agent Architecture System
 
-A sophisticated Python application that automates intern onboarding using a specialized 4-agent architecture: **AI Agent**, **Mail Agent**, **Database Agent**, and **Outlook Agent**. Integrates Microsoft Outlook, Firebase database, and AI services (OpenAI/Gemini) with clean separation of concerns.
+A sophisticated Python application that automates intern onboarding using a specialized 4-agent architecture: **AI Agent**, **Mail Agent**, **Database Agent## Command Line Options
+
+The `main.py` launcher provides flexible deployment options:
+
+```bash
+# Full system (recommended)
+python main.py
+
+# Individual components
+python main.py --backend-only        # Start only FastAPI backend
+python main.py --frontend-only       # Start only Streamlit frontend
+
+# Development options
+python main.py --install             # Install dependencies
+python main.py --backend-port 8080   # Custom backend port
+python main.py --frontend-port 8502  # Custom frontend port
+
+# Help
+python main.py --help                # Show all options
+```ent**. Integrates Microsoft Outlook, Firebase database, and AI services (OpenAI/Gemini) with clean separation of concerns.
 
 ## Features
 
@@ -32,21 +51,21 @@ A sophisticated Python application that automates intern onboarding using a spec
    
    **🚀 Full System (Recommended):**
    ```bash
-   python mail.py
+   python main.py
    ```
    
    **⚙️ Individual Components:**
    ```bash
    # Backend only
-   python mail.py --backend-only
+   python main.py --backend-only
    
    # Frontend only  
-   python mail.py --frontend-only
+   python main.py --frontend-only
    ```
    
    **📦 Install Dependencies:**
    ```bash
-   python mail.py --install
+   python main.py --install
    ```
    
    - Backend API: http://localhost:8000
@@ -66,7 +85,7 @@ Mail Agent/
 │   └── app.py                # FastAPI REST API
 ├── frontend/                  # Frontend UI
 │   └── app.py                # Streamlit web interface
-├── mail.py                   # 🚀 Main entry point
+├── main.py                   # 🚀 Main entry point
 ├── requirements.txt          # Python dependencies
 ├── .env.example             # Environment template
 └── README.md                # This file
@@ -255,7 +274,7 @@ Access interactive API docs at http://localhost:8000/docs
 
 ## Troubleshooting
 
-1. **Import Errors**: Run `python mail.py --install`
+1. **Import Errors**: Run `python main.py --install`
 2. **Authentication Issues**: Check Microsoft app registration and credentials
 3. **Firebase Errors**: Verify service account credentials in `.env`
 4. **AI Errors**: Confirm OpenAI/Gemini API keys are valid

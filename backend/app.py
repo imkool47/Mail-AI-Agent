@@ -395,7 +395,7 @@ if __name__ == "__main__":
     logger.info("🚀 Starting Mail Agent System with 4-Agent Architecture")
     uvicorn.run(
         "app:app",
-        host="0.0.0.0",
+        host="localhost",
         port=8000,
         reload=True,
         log_level="info"

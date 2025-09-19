@@ -27,7 +27,7 @@ if "authenticated" not in st.session_state:
 def check_backend_connection():
     """Check if backend is running"""
     try:
-        response = requests.get(f"{BACKEND_URL}/status", timeout=5)
+        response = requests.get(f"{BACKEND_URL}/", timeout=5)
         return response.status_code == 200
     except:
         return False
@@ -62,7 +62,7 @@ def main():
     # Check backend connection
     if not check_backend_connection():
         st.error("❌ Backend server is not running!")
-        st.info("💡 Please start the system: `python mail.py` or backend only: `python mail.py --backend-only`")
+        st.info("💡 Please start the system: `python main.py` or backend only: `python main.py --backend-only`")
         return
     
     # Sidebar for navigation

@@ -1,0 +1,55 @@
+graph TB
+    %% User Interface Layer
+    subgraph "Frontend (Streamlit)"
+        UI[Streamlit UI<br/>localhost:8501]
+    end
+
+    %% API Layer
+    subgraph "Backend (FastAPI)"
+        API[FastAPI Server<br/>localhost:8000]
+    end
+
+    %% Agent Layer
+    subgraph "4-Agent Architecture"
+        AI[AI Agent<br/>Content Generation<br/>OpenAI/Gemini]
+        MAIL[Mail Agent<br/>Email Operations<br/>SMTP]
+        DB[Database Agent<br/>Data Access<br/>Firebase]
+        OUTLOOK[Outlook Agent<br/>Account Creation<br/>Microsoft Graph API]
+    end
+
+    %% External Services
+    subgraph "External Services"
+        FIREBASE[(Firebase<br/>Firestore)]
+        MSGRAPH[Microsoft Graph API<br/>Azure AD]
+        OPENAI[OpenAI/Gemini<br/>AI Services]
+        SMTP[SMTP Server<br/>Email Provider]
+    end
+
+    %% Data Flow
+    UI --> API
+    API --> AI
+    API --> MAIL
+    API --> DB
+    API --> OUTLOOK
+
+    %% Agent Dependencies
+    AI --> OPENAI
+    MAIL --> SMTP
+    DB --> FIREBASE
+    OUTLOOK --> MSGRAPH
+
+    %% Agent Communication
+    AI -.->|Optional| DB
+    OUTLOOK -.->|Credentials| MAIL
+    AI -.->|Content| MAIL
+
+    %% Styling
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000000
+    classDef backend fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000000
+    classDef agents fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px,color:#000000
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000000
+
+    class UI frontend
+    class API backend
+    class AI,MAIL,DB,OUTLOOK agents
+    class FIREBASE,MSGRAPH,OPENAI,SMTP external
